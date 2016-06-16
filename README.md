@@ -1,4 +1,4 @@
-## saveVideo:  Capturing of videos from the Grashopper USB3 under Linux
+## saveVideo:  Capturing videos from Grashopper USB3 Cameras under Linux
 
 SaveVideo is a small tool to capture and encoding videos. Supports simultaneous capturing from multiple Point Grey USB cameras. 
 
