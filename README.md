@@ -1,6 +1,6 @@
 ## saveVideo:  Capturing videos from Grashopper USB3 Cameras under Linux
 
-SaveVideo is a small tool to capture and encoding videos. Supports simultaneous capturing from multiple Point Grey USB cameras. See the [[https://www.ptgrey.com/support/downloads/10398]]((TechNote)) how to install the ptGrey cameras under linux.
+SaveVideo is a small tool to capture and encoding videos. Supports simultaneous capturing from multiple Point Grey USB cameras. See this [TechNote](https://www.ptgrey.com/support/downloads/10398) how to install the ptGrey cameras under linux.
 
 ### Installation
 
