@@ -3,7 +3,7 @@ CFLAGS=-c -Wall -I/usr/include/flycapture -I/usr/include/ -I/usr/local/include/o
 LDFLAGS=   -L/usr/local/lib -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio -lsigc-2.0 -lglibmm-2.4 -lglib-2.0  -lstdc++ -lncurses -lflycapture
 SOURCES=FrameRateCounter.cpp SaveVideoClass.cpp  SaveVideo.cpp 
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=savevideo
+EXECUTABLE=saveVideo
 
 
 all: $(SOURCES) $(EXECUTABLE)
