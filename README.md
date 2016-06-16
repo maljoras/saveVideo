@@ -4,7 +4,7 @@ SaveVideo is a small tool to capture and encoding videos. Supports simultaneous 
 
 ### Installation
 
-Needs OpenCV, FlyCapSDK, Glibmm-2.4, Glib-2.0, sigc++-2.0 to be installed. 
+Needs OpenCV, FlyCapSDK, Glibmm-2.4, Glib-2.0, sigc++-2.0 to be installed.  Edit the Makefile to your liking. Then
 
 ~~~~
 make
