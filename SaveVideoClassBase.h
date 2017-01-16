@@ -68,6 +68,7 @@ public:
      */ 
     bool isFinished();
 
+    bool isBGR() {return m_bgr;};
 
 private:
 
@@ -86,6 +87,8 @@ protected:
     bool m_WritingFinished;
     bool m_GrabbingFinished;
     bool m_writing;
+    bool m_capturing;
+    bool m_bgr;
     
     std::mutex m_FrameMutex;
     std::condition_variable m_newFrameAvailableCond;

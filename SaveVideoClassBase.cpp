@@ -18,8 +18,9 @@ VideoSaver::VideoSaver()
   m_WritingFinished = true;
   m_GrabbingFinished = true;
   m_writing = false;
+  m_capturing = false;
   m_newFrameAvailable = false;
-  
+  m_bgr = false;
 
 };
 
@@ -33,7 +34,7 @@ int VideoSaver::close()
 {
   _stopWriting();
 
-  if (m_Capture.IsOpened()) {    
+  if (m_Capture.isOpened()) {    
     m_Capture.release();
   }
   sleep(1000);
@@ -43,9 +44,7 @@ int VideoSaver::close()
 /****************************************************************************************/
 int VideoSaver::init(int camIdx)
 {
-  Error error;
-  CameraInfo camInfo;
-  
+
   // Connect the camera
   m_Capture.open(camIdx);
   if (!m_Capture.isOpened()){
@@ -72,10 +71,10 @@ int VideoSaver::init(int camIdx)
     fps = ((double) nframes)/TIMER_ELAPSED;
   }
  
-	// Set the frame rate.
-	// Note that the actual recording frame rate may be slower,
-	// depending on the bus speed and disk writing speed.
-	m_FrameRateToUse = fps;
+  // Set the frame rate.
+  // Note that the actual recording frame rate may be slower,
+  // depending on the bus speed and disk writing speed.
+  m_FrameRateToUse = fps;
 	
   std::cout << "Using frame rate " <<  m_FrameRateToUse << std::endl;
 
@@ -97,14 +96,18 @@ void VideoSaver::_stopWriting()
   while ((!m_GrabbingFinished) || (!m_WritingFinished))
     sleep(100);
 
-  m_captureThread->join();
-  delete(m_captureThread);
-  m_captureThread = NULL;
+  if (m_capturing) {
+    m_captureThread->join();
+    delete(m_captureThread);
+    m_captureThread = NULL;
+    m_capturing = false;
+  }
 
   if (m_writing) {
     m_writingThread->join();
     delete(m_writingThread);
     m_writingThread = NULL;
+    m_writing = false;
   }
 }
 
@@ -173,9 +176,10 @@ int VideoSaver::startCapture() {
     m_WritingFinished = true;
     m_newFrameAvailable = false;
     std::cout <<  "Start video grabbing .." << std::endl;
-
+    
     m_captureThread = new std::thread(&VideoSaver::_captureThread,this);
 
+    m_capturing = true;
     // wait for startup
     sleep(500);
     waitForNewFrame();
@@ -253,12 +257,15 @@ void VideoSaver::_captureThread()
   m_newFrameAvailable = false;
 
   m_timer= std::clock();
-  
+
+	  
   while (m_KeepThreadAlive) {
 
+    double localtimestamp = -1.;
+    
     cv::Mat frame;
     if (m_Capture.grab()) {
-      const double localtimestamp = M_TIMER_ELAPSED;  
+      localtimestamp = M_TIMER_ELAPSED;  
       m_Capture.retrieve(frame);
     } else {
       std::cout<< "Error: a grabbing error occured" << std::endl;
@@ -282,16 +289,11 @@ void VideoSaver::_captureThread()
     }
 
   } 
-  rawImage.ReleaseBuffer();
-  rawImage2.ReleaseBuffer();
-  rgbImage.ReleaseBuffer();
   m_newFrameAvailableCond.notify_one();
     
-  // stop the camera
-  Error error = m_Camera.StopCapture();
-  if ( error != PGRERROR_OK )
-    error.PrintErrorTrace();
-  
+  // stop the capturing
+  m_Capture.release();
+
   m_GrabbingFinished  = true;
 }
 
@@ -317,7 +319,11 @@ void VideoSaver::_captureAndWriteThread()
 
     {
 	    std::unique_lock<std::mutex> lock(m_FrameMutex);
-	    cv::cvtColor(m_Frame,frame,CV_RGB2BGR);	
+	    if (m_bgr) {
+	      cv::cvtColor(m_Frame,frame,CV_RGB2BGR);
+	    } else {
+	      m_Frame.copyTo(frame);
+	    }
 	    localTimeStamp = m_TimeStamp;
 	    grabbedFrameNumber = m_frameNumber;
     }

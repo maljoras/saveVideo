@@ -9,7 +9,7 @@
 #include <string>   // for strings
 //#include <ncurses.h>
 
-#define MINDELAY 250  // waiting time in msec between video frames for the display
+#define MINDELAY 50  // waiting time in msec between video frames for the display
 
 using namespace std;
 
@@ -72,17 +72,19 @@ int main(int argc, const char *argv[]) {
   // init 
   VideoSaver saver;
 
-  if (!saver.init(camIdx)) {
-    cout<< "Error: cannot find camera with index" << camidx << endl;
+  if (saver.init(camIdx)) {
+    cout<< "Error: cannot find camera with index " << camIdx << endl;
     help();
+    saver.close();
     return -1;
   }
   
   const string fname = argv[2];
-	string local_fname= std::string(fname);
+  string local_fname= std::string(fname);
 	
-	if (saver.startCaptureAndWrite(local_fname,fourcc)!=0) {
-	  return -1;
+  if (saver.startCaptureAndWrite(local_fname,fourcc)!=0) {
+    saver.close();
+    return -1;
   }
 
   // wait and display loop
@@ -106,7 +108,9 @@ int main(int argc, const char *argv[]) {
 	    int frameNumber;
 	    saver.getFrame(&frame,&timeStamp,&frameNumber);
 	    cv::resize(frame,smallFrame,size);
-	    cv::cvtColor(smallFrame,smallFrame,CV_RGB2BGR);	
+	    if (saver.isBGR()) {
+	      cv::cvtColor(smallFrame,smallFrame,CV_RGB2BGR);
+	    }
 	    cv::imshow(imname.c_str(), smallFrame);
 	  }
 
@@ -116,7 +120,6 @@ int main(int argc, const char *argv[]) {
 	}    
 	
   saver.close();
-
   return 0;
 
 }
