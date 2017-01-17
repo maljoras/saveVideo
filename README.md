@@ -4,11 +4,12 @@ SaveVideo is a small tool to capture and encoding videos. Supports simultaneous 
 
 ### Installation
 
-Needs OpenCV, FlyCapSDK, Glibmm-2.4, Glib-2.0, sigc++-2.0 and boost to be installed.  Edit the Makefile to your liking. Then
+Needs OpenCV, FlyCapSDK, ncurses to be installed.  Edit the Makefile to your liking. Then
 
 ~~~~
 make
 ~~~~
+
 
 ### Usage
 ~~~~
@@ -23,6 +24,23 @@ If WAITMSEC=0 no display is shown. Otherwise to number of msec to wait before re
 ./saveVideo test.avi X264 500
 ~~~~
 
+
+### Installation for only OpenCV camera support
+Alternatively the capturing and writing can be used by OpenCV compatible cameras (such as webcams) without the FlyCapture SDK. For this one needs only OpenCV to be installed. The tool is called **saveVideoBase**
+
+#### Compilation
+
+~~~~
+make -f MakefileBase
+~~~~
+
+#### Usage
+
+~~~~
+./saveVideoBase camidx inputvideoname [CODEC WAITSEC]
+~~~~
+
+where camidx is the camera index to be used (usually 0 for the first camera installed on the system). 
 
 
 
