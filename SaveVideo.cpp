@@ -3,14 +3,13 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <boost/algorithm/string.hpp>
 
 #include <iostream>
 #include <sstream>
 #include <string>   // for strings
 #include <ncurses.h>
 
-#define MINDELAY 250  // waiting time in msec between video frames for the display
+#define MINDELAY 50  // waiting time in msec between video frames for the display
 
 using namespace std;
 using namespace FlyCapture2;
@@ -24,7 +23,7 @@ static void help()
 {
     cout
         << "------------------------------------------------------------------------------" << endl
-        << "Capturing of videos from the Grashopper. Codecs: X264 MPEG DIVX               "       << endl
+        << "Capturing of videos from FlyCapture SDK cameras. Codecs: X264 MPEG DIVX               "       << endl
         << "if WAITMSEC=0 no display is shown. Otherwise to number of msec to wait. "       << endl
         << "Usage:"                                                                         << endl
         << "         ./savevideo inputvideoName [CODEC WAITMSEC] "                          << endl
@@ -34,7 +33,7 @@ static void help()
 };
 
 
-int selectCameras(VideoSaver ***pppVideoSavers, unsigned int * pNumSelected)
+int selectCameras(VideoSaverFlyCapture ***pppVideoSavers, unsigned int * pNumSelected)
   {
     BusManager busMgr;
     Error error;
@@ -51,7 +50,7 @@ int selectCameras(VideoSaver ***pppVideoSavers, unsigned int * pNumSelected)
 
     if (numCameras==0) 
       {
-	cout << "Cannot find a camera..." << endl;
+	cout << "Cannot find a FlyCapture SDK compatible camera..." << endl;
 	return -1;
       }
 
@@ -129,7 +128,7 @@ int selectCameras(VideoSaver ***pppVideoSavers, unsigned int * pNumSelected)
       }
 
     // construct the objects and init
-    (*pppVideoSavers) =  new VideoSaver*[numSelected];    
+    (*pppVideoSavers) =  new VideoSaverFlyCapture*[numSelected];    
     for ( unsigned int i = 0; i < numSelected; i++) 
       {
         error = busMgr.GetCameraFromIndex( selected[i], &guid );
@@ -139,7 +138,7 @@ int selectCameras(VideoSaver ***pppVideoSavers, unsigned int * pNumSelected)
 	  return -1;
         }
 
-	(*pppVideoSavers)[i] = new VideoSaver();
+	(*pppVideoSavers)[i] = new VideoSaverFlyCapture();
 
 	if ((*pppVideoSavers)[i]->init(guid)!=0)
 	  return -1;
@@ -177,8 +176,6 @@ int main(int argc, const char *argv[])
       fourcc = argv[2];
     }
 
-    boost::to_upper(fourcc);
-    
     if (fourcc.length()!=4) {
       help(); 
       cout << "Second parameter needs to be an FOURCC code" << endl;
@@ -190,7 +187,7 @@ int main(int argc, const char *argv[])
     unsigned int numCameras;
 
     // init 
-    VideoSaver **ppVideoSavers;
+    VideoSaverFlyCapture **ppVideoSavers;
 
     if (selectCameras(&ppVideoSavers,&numCameras)!=0) 
       return -1;
@@ -232,7 +229,7 @@ int main(int argc, const char *argv[])
 	      cv::resize(frame,smallFrame,size);
 	      cv::cvtColor(smallFrame,smallFrame,CV_RGB2BGR);	
 	      cv::imshow(imname.c_str(), smallFrame);
-	      cout << char(i+65) << ": Current Frame rate " <<  ppVideoSavers[i]->getWritingFPS() << "Hz  | " ;
+	      cout << char(i+65) << ": Lost frames " <<  ppVideoSavers[i]->getLostFrameNumber() << " | " ;
 	    };
 	  cout << "\r" ;
 	}
