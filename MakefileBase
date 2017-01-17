@@ -1,0 +1,17 @@
+CC=gcc
+CFLAGS=-c -Wall -std=c++11 -I/usr/include/ -I/usr/local/include/opencv2 
+LDFLAGS=   -L/usr/local/lib -lpthread -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio   -lstdc++ 
+SOURCES=SaveVideoClassBase.cpp  SaveVideoBase.cpp 
+OBJECTS=$(SOURCES:.cpp=.o)
+EXECUTABLE=saveVideoBase
+
+
+all: $(SOURCES) $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJECTS) 
+	$(CC) $(LDFLAGS) $(DEBUG) $(OBJECTS) -o $@
+
+.cpp.o:
+	$(CC) $(CFLAGS) $< -o $@
+clean:
+	rm SaveVideoClassBase.o SaveVideoBase.o saveVideoBase

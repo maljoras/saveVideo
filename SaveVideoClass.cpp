@@ -1,65 +1,50 @@
-
-
 #include "SaveVideoClass.h"
 
-using namespace FlyCapture2;
+#define sleep(x) std::this_thread::sleep_for(std::chrono::milliseconds(x)) 
+#define M_TIMER_ELAPSED ((double)(( std::clock() - m_timer ) / (double) CLOCKS_PER_SEC))
 
-//#define DEBUG
-#define WAITSECONDS 1
-
-//using namespace cv;
-
-
-VideoSaver::VideoSaver()
-{
-  m_KeepWritingAlive = false; // not yet in capture mode
-  m_KeepThreadAlive = false; // not yet in capture mode
-  m_WritingFinished = true;
-  m_GrabbingFinished = true;
-  m_writing = false;
-  m_newFrameAvailable = false;
-  
-  Glib::init();
-
-  // pthread_attr_init(&m_attr);
-  // pthread_attr_setdetachedstate(&m_attr,PTHREAD_CREATE_JOINABLE);
-  // pthread_mutex_init(&m_FrameMutex,NULL);
-
+VideoSaverFlyCapture::VideoSaverFlyCapture()
+{ // base class constructor are automatically called
+  m_isFlycapture = false;
 };
 
 /****************************************************************************************/
-VideoSaver::~VideoSaver()
+VideoSaverFlyCapture::~VideoSaverFlyCapture()
 {
   close();
-  // pthread_attr_destroy(&m_attr);
-  // pthread_mutex_destroy(&m_FrameMutex);
-  // pthread_exit(NULL);
 }
 
-int VideoSaver::close()
+int VideoSaverFlyCapture::close()
 {
-  _stopWriting();
+  VideoSaver::close();
 
   if (m_Camera.IsConnected()) {    
-    Error error = m_Camera.Disconnect();
-    if ( error != PGRERROR_OK ) {
+    FlyCapture2::Error error = m_Camera.Disconnect();
+    if ( error != FlyCapture2::PGRERROR_OK ) {
       error.PrintErrorTrace();
       return -1;
     }
-    Glib::usleep(1000);
+    sleep(500);
   }
   return 0;
 }
 
 /****************************************************************************************/
-int VideoSaver::init(PGRGuid camIdx)
+
+int VideoSaverFlyCapture::init(int camIdx){
+  m_isFlycapture = false;
+  return VideoSaver::init(camIdx);
+}
+
+/****************************************************************************************/
+int VideoSaverFlyCapture::init(FlyCapture2::PGRGuid camIdx)
 {
-  Error error;
-  CameraInfo camInfo;
+  FlyCapture2::Error error;
+  FlyCapture2::CameraInfo camInfo;
   
   // Connect the camera
   error = m_Camera.Connect( &camIdx );
-  if ( error != PGRERROR_OK )
+  if ( error != FlyCapture2::PGRERROR_OK )
     {
       std::cout << "Failed to connect to camera" << std::endl;     
       return -1;
@@ -67,7 +52,7 @@ int VideoSaver::init(PGRGuid camIdx)
     
   // Get the camera info and print it out
   error = m_Camera.GetCameraInfo( &camInfo );
-  if ( error != PGRERROR_OK )
+  if ( error != FlyCapture2::PGRERROR_OK )
     {
       std::cout << "Failed to get camera info from camera" << std::endl;     
       return -1;
@@ -80,10 +65,10 @@ int VideoSaver::init(PGRGuid camIdx)
   //-----------------
   // get frame rate
   // Check if the camera supports the FRAME_RATE property
-  PropertyInfo propInfo;
-  propInfo.type = FRAME_RATE;
+  FlyCapture2::PropertyInfo propInfo;
+  propInfo.type = FlyCapture2::FRAME_RATE;
   error = m_Camera.GetPropertyInfo( &propInfo );
-  if (error != PGRERROR_OK)
+  if (error != FlyCapture2::PGRERROR_OK)
     {
       error.PrintErrorTrace();
       return -1;
@@ -93,10 +78,10 @@ int VideoSaver::init(PGRGuid camIdx)
   if ( propInfo.present == true )
     {
       // Get the frame rate
-      Property prop;
-      prop.type = FRAME_RATE;
+      FlyCapture2::Property prop;
+      prop.type = FlyCapture2::FRAME_RATE;
       error = m_Camera.GetProperty( &prop );
-      if (error != PGRERROR_OK)
+      if (error != FlyCapture2::PGRERROR_OK)
         {
 	  error.PrintErrorTrace();
 	  return -1;
@@ -112,21 +97,21 @@ int VideoSaver::init(PGRGuid camIdx)
   printf("Using frame rate of %3.1f\n", m_FrameRateToUse);
 
   //get the width and height
-  Format7ImageSettings settings;
+  FlyCapture2::Format7ImageSettings settings;
   unsigned int packetSize;
   float percentage;
   error = m_Camera.GetFormat7Configuration( &settings,&packetSize,&percentage );
-  if ( error != PGRERROR_OK ) {
+  if ( error != FlyCapture2::PGRERROR_OK ) {
     error.PrintErrorTrace();
     return -1;
   }
   m_FrameSize =  cv::Size(settings.width,settings.height);
 
-  settings.pixelFormat = PIXEL_FORMAT_RAW8;
+  settings.pixelFormat = FlyCapture2::PIXEL_FORMAT_RAW8;
   bool valid;
-  Format7PacketInfo pinfo;
+  FlyCapture2::Format7PacketInfo pinfo;
   error = m_Camera.ValidateFormat7Settings( &settings,&valid,&pinfo);
-  if ( error != PGRERROR_OK ) {
+  if ( error != FlyCapture2::PGRERROR_OK ) {
     error.PrintErrorTrace();
     return -1;
   }
@@ -137,18 +122,18 @@ int VideoSaver::init(PGRGuid camIdx)
   }
 
   error = m_Camera.SetFormat7Configuration( &settings,pinfo.recommendedBytesPerPacket);
-  if ( error != PGRERROR_OK ) {
+  if ( error != FlyCapture2::PGRERROR_OK ) {
     error.PrintErrorTrace();
     return -1;
   }
 
 
   // set time stamping on
-  EmbeddedImageInfo info;
+  FlyCapture2::EmbeddedImageInfo info;
 
   // Get configuration    
   error = m_Camera.GetEmbeddedImageInfo( &info );
-  if ( error != PGRERROR_OK ) 
+  if ( error != FlyCapture2::PGRERROR_OK ) 
     {
       error.PrintErrorTrace();
       return -1;
@@ -158,319 +143,159 @@ int VideoSaver::init(PGRGuid camIdx)
 
   // Set configuration
   error = m_Camera.SetEmbeddedImageInfo( &info );
-  if ( error != PGRERROR_OK ) 
+  if ( error != FlyCapture2::PGRERROR_OK ) 
     {
       error.PrintErrorTrace();
       return -1;
     }
 
+
+  m_isFlycapture = true;
+  m_isBGR = true;
   return 0;
 }
 
-/****************************************************************************************/
-void VideoSaver::_stopWriting() 
-{
 
-  m_KeepWritingAlive = false;
-  m_KeepThreadAlive = false;
-
-  while ((!m_GrabbingFinished) || (!m_WritingFinished))
-    Glib::usleep(100);
-
-  m_captureThread->join();
-  if (m_writing) {
-    m_writingThread->join();
-  }
-}
 
 /****************************************************************************************/
-cv::Size VideoSaver::getFrameSize() {
-  return m_FrameSize;
-}
-/****************************************************************************************/
-int VideoSaver::getCurrentFrameNumber() {
-  if (!m_GrabbingFinished) {
-    return m_frameNumber;
+int VideoSaverFlyCapture::startCapture() {
+
+  if (!isFlycapture()) {
+    return VideoSaver::startCapture();
+    
   } else {
-    std::cout << "Warning: grabbing finished!!" << std::endl;
-    return -1;
-  }
-}
-/****************************************************************************************/
-int VideoSaver::getFrame(cv::Mat * pFrame ,double * pTimeStamp, int *pFrameNumber) 
-{
-  if (!m_GrabbingFinished) {
-    waitForNewFrame();
-    
-    {
-      Glib::Threads::Mutex::Lock lock(m_FrameMutex);
-      if (m_Frame.size().width==0)
-	*pFrame = cv::Mat::zeros(m_FrameSize,CV_8UC3);
-      else
-	m_Frame.copyTo(*pFrame);
-      *pTimeStamp = m_LocalTimeStamp;
-      *pFrameNumber = m_frameNumber;
-      m_newFrameAvailable = false;
-    }
-    return 0;
-  }
-  else {
-    std::cout << "WARNING getFrame  Failed!" << std::endl;
-    return -1;
-  }
-}
 
-/****************************************************************************************/
-double VideoSaver::getWritingFPS() 
-{
-  return m_FPSCounter.GetFrameRate();
-}
-
-/****************************************************************************************/
-double VideoSaver::getFPS() 
-{
-  return (double) m_FrameRateToUse;
-}
-
-/****************************************************************************************/
-bool VideoSaver::isFinished() 
-{
-  return m_WritingFinished && m_GrabbingFinished;
-}
-
-/****************************************************************************************/
-int VideoSaver::startCapture() {
-
-  if (isFinished()) {
-    // start thread to begin capture and populate Mat frame
-    Error error = m_Camera.StartCapture();
-    if ( error == PGRERROR_ISOCH_BANDWIDTH_EXCEEDED )
-    {
-      std::cout << "Bandwidth exceeded" << std::endl;     
-      return -1;
-    }
-    else if ( error != PGRERROR_OK )
-    {
-      std::cout << "Failed to start image capture" << std::endl;     
-      return -1;
-    } 
-    
-    
-    //start the grabbing thread
-    m_KeepWritingAlive = false;  // not to be started
-    m_WritingFinished = true;
-    m_newFrameAvailable = false;
-    std::cout <<  "Start video grabbing .." << std::endl;
-
-    //boost::thread captureThread(&VideoSaver::_captureThread,this);
-    m_captureThread = Glib::Threads::Thread::create(sigc::mem_fun(*this, &VideoSaver::_captureThread));
-
-    // wait for startup
-    Glib::usleep(500);
-    waitForNewFrame();
-    return 0;
-
-  } else {
-    std::cout << "Warning: capture not finished !" << std::endl;
-    return -1;
-  } 
   
-}
-
-void VideoSaver::waitForNewFrame() {
-
-  Glib::Timer timer;
-  timer.start();
-
-  while (1) {
-    {
-      Glib::Threads::Mutex::Lock lock(m_FrameMutex);
-#ifdef DEBUG
-      std::cout << m_newFrameAvailable;
-#endif
-      if (m_newFrameAvailable) 
-	break;
-      if (timer.elapsed()>WAITSECONDS) {
-	std::cout << "waited for long enough. No Frame ?" << std::endl;
-#ifdef DEBUG
-	std::cout << " framenumber: " << m_frameNumber << std::endl;
-	std::cout << " Camera connected: " << m_Camera.IsConnected() << std::endl;
-#endif
+    if (isFinished() && (isInit())) {
+      // start thread to begin capture and populate Mat frame
+      FlyCapture2::Error error = m_Camera.StartCapture();
+      if ( error == FlyCapture2::PGRERROR_ISOCH_BANDWIDTH_EXCEEDED )
+      {
+	std::cout << "Bandwidth exceeded" << std::endl;     
+	return -1;
       }
-    }
-    Glib::usleep(200);
+      else if ( error != FlyCapture2::PGRERROR_OK )
+      {
+	std::cout << "Failed to start image capture" << std::endl;     
+	return -1;
+      } 
+    
+    
+      //start the grabbing thread
+      m_KeepWritingAlive = false;  // not to be started
+      m_WritingFinished = true;
+      m_newFrameAvailable = false;
+      std::cout <<  "Start video grabbing .." << std::endl;
+
+      m_captureThread = new std::thread(&VideoSaverFlyCapture::captureThread,this);
+
+      m_capturing = true;
+
+      sleep(500);
+      waitForNewFrame();
+
+      return 0;
+
+    } else {
+      if (isInit()) {
+	std::cout << "Warning: capture not yet finished !" << std::endl;    
+      } else {
+	std::cout << "Warning: camera not available!" << std::endl;    
+      }
+      return -1;    
+    } 
   }
 }
 
-
 /****************************************************************************************/
-int VideoSaver::startCaptureAndWrite(const string inFname, string codec)
+bool VideoSaverFlyCapture::isInit() 
 {
-  // start the capture 
-  if (startCapture()!=0) 
-    return -1;
-
-  // open file stream for the tpoints
-  string fname = string(inFname);
-  string txtfname;
-  txtfname = fname + ".txt";
-
-  m_OutputFile.open(txtfname.c_str(), std::ios::out );
-
-  if (!m_OutputFile.is_open()) 
-    {
-      std::cout  << "Could not open the output text for write: " << txtfname << std::endl;
-      return -1;
-    }
-
-  //start the video stream
-  m_Video = cv::VideoWriter(fname,CV_FOURCC(codec[0],codec[1],codec[2],codec[3]),m_FrameRateToUse, m_FrameSize ,true);
-
-  if (!m_Video.isOpened())
-    {
-      std::cout  << "Could not open the output video for write: " << fname << std::endl;
-      return -1;
-    }
-
-  
-  // start the writing thread
-  std::cout <<  "Start video saving.." << std::endl;
-  m_writing = true;
-  m_writingThread = Glib::Threads::Thread::create(sigc::mem_fun(*this, &VideoSaver::_captureAndWriteThread));
-
-  return 0;
-
+  if (isFlycapture())
+    return (m_Camera.IsConnected() && (!m_capturing));
+  else
+    return VideoSaver::isInit();
 }
 
+
+
 /****************************************************************************************/
-void VideoSaver::_captureThread()
+void VideoSaverFlyCapture::captureThread()
 {
 
   m_GrabbingFinished = false;
   m_KeepThreadAlive = true;
   m_frameNumber = 0;
   m_newFrameAvailable = false;
-  Image rgbImage;
-  Image rawImage;
-  Image rawImage2;
+  FlyCapture2::Image rgbImage;
+  FlyCapture2::Image rawImage;
+  FlyCapture2::Image rawImage2;
 
-  m_timer.start();
+  m_timer= std::clock();
   
   while (m_KeepThreadAlive) 
     {
 
-      Error error = m_Camera.RetrieveBuffer( &rawImage );
-      if ( error != PGRERROR_OK )
+      FlyCapture2::Error error = m_Camera.RetrieveBuffer( &rawImage );
+      if ( error != FlyCapture2::PGRERROR_OK )
 	{
 	  error.PrintErrorTrace();
 	}
       
       //get the time stamp
-      const double localtimestamp = m_timer.elapsed();
+      const double localtimestamp = M_TIMER_ELAPSED;
 
       // convert to bgr
       rawImage2.DeepCopy(&rawImage); // not sure if really needed since we convert below...
-      rawImage2.Convert(PIXEL_FORMAT_RGB, &rgbImage );
+      rawImage2.Convert(FlyCapture2::PIXEL_FORMAT_RGB, &rgbImage );
 
       // convert to Mat
       unsigned int rowBytes = (double) rgbImage.GetReceivedDataSize()/(double)rgbImage.GetRows();       
 
       // copy to frame variable and update times
-      {
-	Glib::Threads::Mutex::Lock lock(m_FrameMutex);
+      { std::unique_lock<std::mutex> lock(m_FrameMutex); 
+
 	m_Frame.release();
 	m_Frame = cv::Mat(rgbImage.GetRows(), rgbImage.GetCols(), CV_8UC3, rgbImage.GetData(),rowBytes);
 	// could this happen ?
 	if (m_Frame.size().width==0) 
 	   m_Frame = cv::Mat::zeros(m_FrameSize,CV_8UC3);
 
-	//rawFrame.copyTo(m_Frame); 
-	m_TimeStamp = rawImage.GetTimeStamp();
+	m_TimeStamp =  localtimestamp;
 	m_frameNumber++;
-	m_LocalTimeStamp = localtimestamp;
 	m_newFrameAvailable = true;
+	m_newFrameAvailableCond.notify_one();
       }
 
-      //cv::namedWindow( "Frame", cv::WINDOW_AUTOSIZE );
-      //cv::imshow( "Frame", m_Frame);
-      //cv::waitKey(10);
 
     } 
   rawImage.ReleaseBuffer();
   rawImage2.ReleaseBuffer();
   rgbImage.ReleaseBuffer();
 
-    
-  // stop the camera
-  Error error = m_Camera.StopCapture();
-  if ( error != PGRERROR_OK )
-    error.PrintErrorTrace();
+  m_newFrameAvailableCond.notify_one();
+
+  stopCapturing();
   
   m_GrabbingFinished  = true;
 }
 
 
 /****************************************************************************************/
-void VideoSaver::_captureAndWriteThread()
-{
-  m_WritingFinished = false;
-  Error error;
+int VideoSaverFlyCapture::stopCapturing() {
 
-  // capture loop
-  int frameNumber=0;
-  m_FPSCounter.Reset();
-  m_KeepWritingAlive = true;
-
-
-  int delayFound = 0;
-  int grabbedFrameNumber;
-  cv::Mat frame;
-  FlyCapture2::TimeStamp timeStamp;
-  double localTimeStamp;
-  while(m_KeepWritingAlive)
-    {
-      //unsigned int micsec = ctime.microSeconds;
-      const double currentTime =  m_timer.elapsed();
-
-      {
-	Glib::Threads::Mutex::Lock lock(m_FrameMutex);
-
-	//frame = m_Frame.clone();
-	cv::cvtColor(m_Frame,frame,CV_RGB2BGR);	
-	localTimeStamp = m_LocalTimeStamp;
-	timeStamp = m_TimeStamp;
-	grabbedFrameNumber = m_frameNumber;
-      }
-      //
-      m_Video.write(frame); // slow, thus out of the lock
-
-
-      if (timeStamp.microSeconds==0) // seems not to work
-	m_OutputFile << frameNumber << "\t" << grabbedFrameNumber <<"\t" <<  std::fixed << std::setprecision(5) << localTimeStamp << std::endl;
-      else 
-	m_OutputFile << frameNumber << "\t" << grabbedFrameNumber <<"\t" <<  std::fixed << std::setprecision(5) << timeStamp.seconds << "\t" << timeStamp.microSeconds << std::endl;
-
-      frameNumber++; // this is the writing number 
-
-
-      m_FPSCounter.NewFrame();
-      const double thisTime = m_timer.elapsed();
-      const double seconds = thisTime - currentTime;	
-      delayFound = static_cast<int> (1000./m_FrameRateToUse - seconds*1000.);
-      if (delayFound>0)
-	Glib::usleep(delayFound*1000);
-
+  if (!isFlycapture()) {
+    return VideoSaver::stopCapturing();
+  } else {
+    // stop the camera
+    FlyCapture2::Error error = m_Camera.StopCapture();
+    if ( error != FlyCapture2::PGRERROR_OK ) {
+      error.PrintErrorTrace();
+      return -1;
+    } else {
+      return 0;
     }
-
-  while (!m_GrabbingFinished)
-    Glib::usleep(1000);
-    
-  //close the files
-  m_Video.release();
-  m_OutputFile.close();
+  }
+}
 
 
-  std::cout << "Finished writing" << std::endl;    
-  m_WritingFinished = true;
-};
 

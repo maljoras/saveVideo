@@ -24,87 +24,105 @@ using namespace std;
 class VideoSaver  
 {
 public:
-    /** Constructor. */
-    VideoSaver();
+  /** Constructor. */
+  VideoSaver();
 
-    /** Destructor. */
-    virtual ~VideoSaver();
+  /** Destructor. */
+  virtual ~VideoSaver();
 
-    /**
-     * Captures and writes the video to the file
-     */ 
-    int startCaptureAndWrite(const string fname, string codec);
+  /**
+   * Captures and writes the video to the file
+   */ 
+  int startCaptureAndWrite(const string fname, string codec);
 
-    /**
-     * Captures without writing to video file
-     */ 
-    int startCapture();
+  /**
+   * Captures without writing to video file
+   */ 
+  virtual int startCapture();
 
-    /**
-     * makes the current frame available in "Frame"
-     */ 
-    int getFrame(cv::Mat * pFrame ,double * pTimeStamp, int *pFrameNumber);
-    /**
-     * returns the current framecounter
-     */ 
-    int getCurrentFrameNumber();
+  /**
+   * makes the current frame available in "Frame"
+   */ 
+  int getFrame(cv::Mat * pFrame ,double * pTimeStamp, int *pFrameNumber);
+  /**
+   * returns the current framecounter
+   */ 
+  int getCurrentFrameNumber();
     
-    int close();
+  virtual int close();
 
-    int init(int camIdx);
+  virtual int init(int camIdx);
 
-    /**
-     * returns frame size 
-     */
-    cv::Size getFrameSize();
+  /**
+   * returns frame size 
+   */
+  cv::Size getFrameSize();
 
-    /**
-     * returns the theoretical FPS set (usually set by the camera)
-     */
-    double getFPS();
+  /**
+   * returns the theoretical FPS set (usually set by the camera)
+   */
+  double getFPS();
 
-    /**
-     * Asks whether writing is finished
-     */ 
-    bool isFinished();
+  /**
+   * Asks whether writing is finished
+   */ 
+  bool isFinished();
 
-    bool isBGR() {return m_bgr;};
 
-private:
+  /**
+   * Whether init was done  (capture device avaibable)
+   */ 
 
-   void _stopWriting();
-   void _captureThread();
-   void _captureAndWriteThread();
-   void waitForNewFrame();
-   
-protected:
-
-    std::clock_t m_timer;  
-
-    bool m_newFrameAvailable;
-    bool m_KeepThreadAlive;
-    bool m_KeepWritingAlive;
-    bool m_WritingFinished;
-    bool m_GrabbingFinished;
-    bool m_writing;
-    bool m_capturing;
-    bool m_bgr;
+  virtual bool isInit();
     
-    std::mutex m_FrameMutex;
-    std::condition_variable m_newFrameAvailableCond;
-    std::thread * m_captureThread;
-    std::thread * m_writingThread;
+  bool isBGR() {return m_isBGR;};
+  
+  int getLostFrameNumber();
+
 	
-    cv::VideoCapture m_Capture;
-    float m_FrameRateToUse;
-    cv::Size m_FrameSize;
-    
-    
-    cv::Mat m_Frame;
-    double m_TimeStamp;
+private:
+  
+  int stopWriting();
 
-    int m_frameNumber;
+  cv::VideoCapture m_Capture;
 
-    std::fstream m_OutputFile;
-    cv::VideoWriter m_Video;
+  std::fstream m_OutputFile;
+  cv::VideoWriter m_Video;
+
+  bool m_writing;
+  int m_writingFrameNumber;
+  
+protected:
+  
+  virtual void captureThread();
+  virtual int stopCapturing();
+	
+  void captureAndWriteThread();
+  void waitForNewFrame();
+
+  
+  std::clock_t m_timer;  
+  cv::Mat m_Frame;
+  double m_TimeStamp;
+  int m_frameNumber;
+
+  
+  float m_FrameRateToUse;
+  cv::Size m_FrameSize;
+
+  
+  bool m_newFrameAvailable;
+  bool m_KeepThreadAlive;
+  bool m_KeepWritingAlive;
+  bool m_WritingFinished;
+  bool m_GrabbingFinished;
+
+  bool m_capturing;
+  bool m_isBGR;
+    
+  std::mutex m_FrameMutex;
+  std::condition_variable m_newFrameAvailableCond;
+  std::thread * m_captureThread;
+  std::thread * m_writingThread;
+	
 };

@@ -20,7 +20,9 @@ VideoSaver::VideoSaver()
   m_writing = false;
   m_capturing = false;
   m_newFrameAvailable = false;
-  m_bgr = false;
+  m_isBGR = false;
+  m_writingFrameNumber = 0;
+  m_frameNumber = 0;
 
 };
 
@@ -32,12 +34,18 @@ VideoSaver::~VideoSaver()
 
 int VideoSaver::close()
 {
-  _stopWriting();
+  stopWriting();
+  stopCapturing();
+  sleep(500);
+  return 0;
+}
+
+/****************************************************************************************/
+int VideoSaver::stopCapturing() {
 
   if (m_Capture.isOpened()) {    
     m_Capture.release();
   }
-  sleep(1000);
   return 0;
 }
 
@@ -82,12 +90,13 @@ int VideoSaver::init(int camIdx)
   double height = (double) m_Capture.get(cv::CAP_PROP_FRAME_HEIGHT);
   double width  = (double) m_Capture.get(cv::CAP_PROP_FRAME_WIDTH);
   m_FrameSize =  cv::Size(width,height);
-   
+
+  m_isBGR = false;
   return 0;
 }
 
 /****************************************************************************************/
-void VideoSaver::_stopWriting() 
+int VideoSaver::stopWriting() 
 {
 
   m_KeepWritingAlive = false;
@@ -109,6 +118,8 @@ void VideoSaver::_stopWriting()
     m_writingThread = NULL;
     m_writing = false;
   }
+
+  return 0;
 }
 
 /****************************************************************************************/
@@ -124,6 +135,12 @@ int VideoSaver::getCurrentFrameNumber() {
     return -1;
   }
 }
+
+/****************************************************************************************/
+int VideoSaver::getLostFrameNumber() {
+  return m_frameNumber-m_writingFrameNumber;
+}
+
 /****************************************************************************************/
 int VideoSaver::getFrame(cv::Mat * pFrame ,double * pTimeStamp, int *pFrameNumber) 
 {
@@ -134,10 +151,10 @@ int VideoSaver::getFrame(cv::Mat * pFrame ,double * pTimeStamp, int *pFrameNumbe
       std::unique_lock<std::mutex> lock(m_FrameMutex);
       
       if (m_Frame.size().width==0) {
-	      *pFrame = cv::Mat::zeros(m_FrameSize,CV_8UC3);
+	*pFrame = cv::Mat::zeros(m_FrameSize,CV_8UC3);
       }
       else {
-	      m_Frame.copyTo(*pFrame);
+	m_Frame.copyTo(*pFrame);
       }
       *pTimeStamp = m_TimeStamp;
       *pFrameNumber = m_frameNumber;
@@ -165,10 +182,18 @@ bool VideoSaver::isFinished()
   return m_WritingFinished && m_GrabbingFinished;
 }
 
+
+/****************************************************************************************/
+bool VideoSaver::isInit() 
+{
+  return (m_Capture.isOpened() && (!m_capturing));
+}
+
+
 /****************************************************************************************/
 int VideoSaver::startCapture() {
 
-  if (isFinished() && (m_Capture.isOpened())) {
+  if (isFinished() && (isInit())) {
     // start thread to begin capture and populate Mat frame
     
     //start the grabbing thread
@@ -177,7 +202,7 @@ int VideoSaver::startCapture() {
     m_newFrameAvailable = false;
     std::cout <<  "Start video grabbing .." << std::endl;
     
-    m_captureThread = new std::thread(&VideoSaver::_captureThread,this);
+    m_captureThread = new std::thread(&VideoSaver::captureThread,this);
 
     m_capturing = true;
     // wait for startup
@@ -187,7 +212,7 @@ int VideoSaver::startCapture() {
     return 0;
 
   } else {
-      if (m_Capture.isOpened()) {
+    if (isInit()) {
         std::cout << "Warning: capture not yet finished !" << std::endl;    
       } else {
         std::cout << "Warning: camera not available!" << std::endl;    
@@ -239,7 +264,7 @@ int VideoSaver::startCaptureAndWrite(const string inFname, string codec)
   // start the writing thread
   std::cout <<  "Start video saving.." << std::endl;
   m_writing = true;
-  m_writingThread = new std::thread(&VideoSaver::_captureAndWriteThread,this);
+  m_writingThread = new std::thread(&VideoSaver::captureAndWriteThread,this);
   
   return 0;
 
@@ -248,7 +273,7 @@ int VideoSaver::startCaptureAndWrite(const string inFname, string codec)
 
 
 /****************************************************************************************/
-void VideoSaver::_captureThread()
+void VideoSaver::captureThread()
 {
 
   m_GrabbingFinished = false;
@@ -278,33 +303,33 @@ void VideoSaver::_captureThread()
     // copy to frame variable and update times
     {  std::unique_lock<std::mutex> lock(m_FrameMutex); 
 
-	     m_Frame.release();
-	     m_Frame = frame.clone();
-	     
-
-	     m_TimeStamp =localtimestamp; 
-	     m_frameNumber++;
-	     m_newFrameAvailable = true;
-       m_newFrameAvailableCond.notify_one();
+      m_Frame.release();
+      m_Frame = frame.clone();
+      
+      
+      m_TimeStamp =localtimestamp; 
+      m_frameNumber++;
+      m_newFrameAvailable = true;
+      m_newFrameAvailableCond.notify_one();
     }
 
   } 
   m_newFrameAvailableCond.notify_one();
     
   // stop the capturing
-  m_Capture.release();
+  stopCapturing();
 
   m_GrabbingFinished  = true;
 }
 
 
 /****************************************************************************************/
-void VideoSaver::_captureAndWriteThread()
+void VideoSaver::captureAndWriteThread()
 {
   m_WritingFinished = false;
 
   // capture loop
-  int frameNumber=0;
+  m_writingFrameNumber=0;
   m_KeepWritingAlive = true;
 
 
@@ -312,31 +337,31 @@ void VideoSaver::_captureAndWriteThread()
   int grabbedFrameNumber;
   cv::Mat frame;
   double localTimeStamp;
-  
+  int frameNumber;
+    
   while(m_KeepWritingAlive) {
     
     const double currentTime =  M_TIMER_ELAPSED;
 
     {
-	    std::unique_lock<std::mutex> lock(m_FrameMutex);
-	    if (m_bgr) {
-	      cv::cvtColor(m_Frame,frame,CV_RGB2BGR);
-	    } else {
-	      m_Frame.copyTo(frame);
-	    }
-	    localTimeStamp = m_TimeStamp;
-	    grabbedFrameNumber = m_frameNumber;
+      std::unique_lock<std::mutex> lock(m_FrameMutex);
+      if (isBGR()) {
+	cv::cvtColor(m_Frame,frame,CV_RGB2BGR);
+      } else {
+	m_Frame.copyTo(frame);
+      }
+      localTimeStamp = m_TimeStamp;
+      grabbedFrameNumber = m_frameNumber;
+      frameNumber  = m_writingFrameNumber++;
     }
       
     m_Video.write(frame); // slow, thus out of the lock
 
-	  m_OutputFile << frameNumber 
+    m_OutputFile << frameNumber 
       << "\t" << grabbedFrameNumber <<"\t" 
       <<  std::fixed << std::setprecision(5) 
       << localTimeStamp << std::endl;
-    
 
-    frameNumber++; // this is the writing number 
 
     const double thisTime = M_TIMER_ELAPSED;
     const double seconds = thisTime - currentTime;	

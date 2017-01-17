@@ -1,119 +1,49 @@
 #include "FlyCapture2.h"
-
-#include "FrameRateCounter.h"
-#include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
-//#include <opencv2/opencv.hpp>
-#include <iostream>
-#include <string>   // for strings
-#include <sstream>
-#include <fstream>   
-#include <iomanip>
-
-#include <glibmm/threads.h>
-#include <glibmm/timer.h>
-#include <glibmm/init.h>
-
-// Include Boost headers for system time and threading
+#include "SaveVideoClassBase.h"
 
 using namespace std;
-using namespace FlyCapture2;
-//using namespace cv;
 
-//#include "Profiler.h"
 
 /**
  * SaveVideo Class.  Saves and displays a video captured from a camaera.
  */ 
-class VideoSaver  
+class VideoSaverFlyCapture: public VideoSaver  
 {
 public:
-    /** Constructor. */
-    VideoSaver();
+  /** Constructor. */
+  VideoSaverFlyCapture();
 
-    /** Destructor. */
-    virtual ~VideoSaver();
+  /** Destructor. */
+  virtual ~VideoSaverFlyCapture();
 
-    /**
-     * Captures and writes the video to the file
-     */ 
-    int startCaptureAndWrite(const string fname, string codec);
+  /**
+   */
+  bool isFlycapture() {
+    return m_isFlycapture;
+  };
 
-    /**
-     * Captures without writing to video file
-     */ 
-    int startCapture();
+	
+  /**
+   * Captures and writes the video to the file
+   */ 
+  virtual int startCapture();
 
-    /**
-     * makes the current frame available in "Frame"
-     */ 
-    int getFrame(cv::Mat * pFrame ,double * pTimeStamp, int *pFrameNumber);
-    /**
-     * returns the current framecounter
-     */ 
-    int getCurrentFrameNumber();
-    
-    int close();
+  virtual int close();
 
-    int init(PGRGuid camIdx);
+  virtual int init(int camIdx);
+  
+  int init(FlyCapture2::PGRGuid camIdx);
 
-    /**
-     * returns the current frame rate of the video writing 
-     */ 
-    double getWritingFPS();
-
-    /**
-     * returns frame size 
-     */
-    cv::Size getFrameSize();
-
-    /**
-     * returns the theoretical FPS set (usually set by the camera)
-     */
-    double getFPS();
-
-    /**
-     * Asks whether writing is finished
-     */ 
-    bool isFinished();
-
+  virtual bool isInit();
 
 private:
 
-   void _stopWriting();
-   void _captureThread();
-   void _captureAndWriteThread();
-   void waitForNewFrame();
-   
+  FlyCapture2::Camera m_Camera;
+  bool m_isFlycapture;
+  
 protected:
 
-    FrameRateCounter m_FPSCounter;
-    Glib::Timer m_timer;  
+  virtual int stopCapturing();
+  virtual void captureThread();	
 
-    bool m_newFrameAvailable;
-    bool m_KeepThreadAlive;
-    bool m_KeepWritingAlive;
-    bool m_WritingFinished;
-    bool m_GrabbingFinished;
-    bool m_writing;
-    
-    Glib::Threads::Mutex m_FrameMutex;
-    Glib::Threads::Thread * m_captureThread;
-    Glib::Threads::Thread * m_writingThread;
-	
-    FlyCapture2::Camera m_Camera;
-    float m_FrameRateToUse;
-    cv::Size m_FrameSize;
-    
-    
-    cv::Mat m_Frame;
-    FlyCapture2::TimeStamp m_TimeStamp;
-
-    double m_LocalTimeStamp;
-
-    int m_frameNumber;
-
-    std::fstream m_OutputFile;
-    cv::VideoWriter m_Video;
 };
